@@ -1,14 +1,18 @@
+import logging
 from peewee import *
 from playhouse.db_url import connect
 from datetime import datetime
 import os
 
-# Check for DATABASE_URL environment variable (common in PaaS like Railway)
+logger = logging.getLogger(__name__)
+
 database_url = os.getenv("DATABASE_URL")
 
 if database_url:
+    logger.info("Using DATABASE_URL for database connection")
     db = connect(database_url)
 else:
+    logger.info("Using local database")
     db = SqliteDatabase('bot_database.db')
 
 class BaseModel(Model):

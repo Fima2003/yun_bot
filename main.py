@@ -1,3 +1,5 @@
+# This line is first to load environment variables
+import config
 import logging
 from bot.core import run_bot
 from db.core import init_db
