@@ -20,8 +20,8 @@ class BaseModel(Model):
         database = db
 
 class GroupMember(BaseModel):
-    user_id = IntegerField()
-    chat_id = IntegerField()
+    user_id = BigIntegerField()
+    chat_id = BigIntegerField()
     join_date = DateTimeField(null=True)
     is_safe = BooleanField(default=False)
 
