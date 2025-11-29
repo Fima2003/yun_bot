@@ -11,7 +11,7 @@ async def join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handles new chat members and adds them to the database.
     """
     new_users = update.message.new_chat_members
-    print(new_users)
+    logger.info(f"New users: {new_users}")
     if not new_users:
         return
 
