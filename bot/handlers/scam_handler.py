@@ -43,40 +43,53 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
         image_data = None
         
         # Logic 2: Language Detection
-        if text:
-            if language_service.is_russian(text):
-                logger.warning("Russian language detected. Deleting message.")
-                try:
-                    await update.message.delete()
-                    return
-                except Exception as e:
-                    logger.error(f"Failed to delete Russian message: {e}")
-                    return
+        # User request: "If not in russian, then don't do anything"
+        is_russian = False
+        if text and language_service.is_russian(text):
+            is_russian = True
+        
+        if not is_russian:
+            logger.info("Message not in Russian (or no text). Skipping checks.")
+            return
 
-        # Check for photos
+        # Logic 3: Gemini Analysis (Only if Russian)
+        # Prepare content for Gemini
+        image_data = None
         if update.message.photo:
             # Get the largest photo
             photo = update.message.photo[-1]
-            file = await context.bot.get_file(photo.file_id)
-            image_byte_array = await file.download_as_bytearray()
+            photo_file = await photo.get_file()
+            image_byte_array = await photo_file.download_as_bytearray()
             image_data = bytes(image_byte_array)
 
-        if not text and not image_data:
-            logger.info("No text or image data. Returning.")
-            return
-
-        # Logic 3: Gemini Analysis
+        logger.info("Analyzing Russian message with Gemini...")
         scam_score = await gemini_service.analyze_content(text, image_data)
-        logger.info(f"Scam score: {scam_score}")
+        logger.info(f"Gemini Scam Score: {scam_score}")
 
+        # Logic 4: Action based on Scam Score
         if scam_score > SCAM_THRESHOLD:
-            logger.warning(f"Scam detected! Score: {scam_score}. Deleting message and banning user.")
+            # Case: Russian AND Scam -> Delete & Ban
+            logger.warning(f"Scam detected (Score: {scam_score}) in Russian message. Deleting and Banning.")
             try:
                 await update.message.delete()
-                await context.bot.ban_chat_member(chat.id, user.id)
+                await context.bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
                 logger.info(f"User {user.id} banned.")
             except Exception as e:
-                logger.error(f"Failed to delete message or ban user: {e}")
+                logger.error(f"Failed to delete/ban: {e}")
+        else:
+            # Case: Russian BUT Not Scam -> Delete & Warn
+            logger.info(f"Russian message detected but not scam (Score: {scam_score}). Deleting and Warning.")
+            try:
+                # Reply first so the user sees it (if possible before delete, or tag them)
+                # We can't reply to a deleted message easily, so send message to chat tagging user?
+                # Or reply then delete? Reply then delete is standard but the reply might lose context if parent is gone.
+                # Telegram allows replying, then deleting the parent. The reply remains.
+                await update.message.reply_text(
+                    f"@{user.username or user.first_name} Будь ласка, спілкуйтеся Українською🇺🇦, Англійською🇬🇧 або Івритом🇮🇱!"
+                )
+                await update.message.delete()
+            except Exception as e:
+                logger.error(f"Failed to delete/warn: {e}")
 
     except Exception as e:
         logger.error(f"Error in scam_handler: {e}")
