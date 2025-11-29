@@ -17,6 +17,7 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Handles incoming messages and checks for scams if the user is new.
     """
     if not update.message or not update.message.from_user or not update.message.chat:
+        logger.info("No message or user or chat. Returning.")
         return
 
     user = update.message.from_user
@@ -24,6 +25,7 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Only check in groups/supergroups
     if chat.type not in ['group', 'supergroup']:
+        logger.info("Not a group or supergroup. Returning.")
         return
 
     try:
@@ -32,6 +34,7 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Logic 1: If NOT new (joined > 2 days), break/return
         if not is_new:
+            logger.info("User is not new (joined > 2 days ago). Returning.")
             return
 
         logger.info(f"New user detected. Analyzing message...")
@@ -45,10 +48,6 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning("Russian language detected. Deleting message.")
                 try:
                     await update.message.delete()
-                    # User requested "delete the message" for Russian. 
-                    # Did not explicitly say "ban" for Russian, but said "delete".
-                    # I will stick to delete only for now to be safe, or maybe ban?
-                    # Request said: "If russian - delete the message."
                     return
                 except Exception as e:
                     logger.error(f"Failed to delete Russian message: {e}")
@@ -63,6 +62,7 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
             image_data = bytes(image_byte_array)
 
         if not text and not image_data:
+            logger.info("No text or image data. Returning.")
             return
 
         # Logic 3: Gemini Analysis

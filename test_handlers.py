@@ -1,7 +1,7 @@
 import unittest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from bot.handlers.handlers import scam_handler
+from bot.handlers.scam_handler import scam_handler
 from config import SCAM_THRESHOLD
 
 class TestHandlers(unittest.TestCase):

@@ -1,7 +1,7 @@
 from bot.handlers.added_to_group_chat_handler import added_to_group_chat_handler
 from telegram.ext.filters import StatusUpdate
 from telegram.ext.filters import TEXT, PHOTO, CAPTION
-from bot.handlers.handlers import handle_scam
+from bot.handlers.scam_handler import handle_scam
 from bot.handlers.start import start_command
 from bot.handlers.join_handler import join_handler
 import logging
