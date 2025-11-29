@@ -18,7 +18,7 @@ def run_bot():
     application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     
     # Handle /start command
-    application.add_handlers(
+    application.add_handler(
         CommandHandler('start', start_command),
     )
 
