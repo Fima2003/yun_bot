@@ -2,6 +2,6 @@ python-telegram-bot
 google-generativeai
 Pillow
 python-dotenv
-langdetect
+lingua-language-detector
 peewee
 psycopg2-binary

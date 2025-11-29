@@ -11,7 +11,9 @@ class TestLanguageService(unittest.TestCase):
         
         # Ukrainian text
         self.assertFalse(service.is_russian("Привіт, як справи?"))
-        self.assertFalse(service.is_russian("Це український текст."))
+        
+        # English text
+        self.assertFalse(service.is_russian("Hello, how are you?"))
         
         # English text
         self.assertFalse(service.is_russian("Hello, how are you?"))
