@@ -29,21 +29,9 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        # Check if user is new
-        is_new = await user_service.is_new_user(user.id, chat.id, context)
+        text = update.message.text or update.message.caption
         
-        # Logic 1: If NOT new (joined > 2 days), break/return
-        if not is_new:
-            logger.info("User is not new (joined > 2 days ago). Returning.")
-            return
-
-        logger.info(f"New user detected. Analyzing message...")
-        
-        text = update.message.text or update.message.caption or ""
-        image_data = None
-        
-        # Logic 2: Language Detection
-        # User request: "If not in russian, then don't do anything"
+        # Logic 1: Language Detection (First check as requested)
         is_russian = False
         if text and language_service.is_russian(text):
             is_russian = True
@@ -52,7 +40,7 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info("Message not in Russian (or no text). Skipping checks.")
             return
 
-        # Logic 3: Gemini Analysis (Only if Russian)
+        # Logic 2: Gemini Analysis (Only if Russian)
         # Prepare content for Gemini
         image_data = None
         if update.message.photo:
@@ -66,7 +54,7 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
         scam_score = await gemini_service.analyze_content(text, image_data)
         logger.info(f"Gemini Scam Score: {scam_score}")
 
-        # Logic 4: Action based on Scam Score
+        # Logic 3: Action based on Scam Score
         if scam_score > SCAM_THRESHOLD:
             # Case: Russian AND Scam -> Delete & Ban
             logger.warning(f"Scam detected (Score: {scam_score}) in Russian message. Deleting and Banning.")
@@ -77,13 +65,19 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Failed to delete/ban: {e}")
         else:
-            # Case: Russian BUT Not Scam -> Delete & Warn
-            logger.info(f"Russian message detected but not scam (Score: {scam_score}). Deleting and Warning.")
+            # Case: Russian BUT Not Scam -> Check User Age
+            logger.info(f"Russian message detected but not scam (Score: {scam_score}). Checking user age...")
+            
+            is_new = await user_service.is_new_user(user.id, chat.id, context)
+            
+            if not is_new:
+                logger.info("User is OLD. Allowing Russian message.")
+                return
+
+            # User is NEW -> Delete & Warn
+            logger.info("User is NEW. Deleting and Warning.")
             try:
                 # Reply first so the user sees it (if possible before delete, or tag them)
-                # We can't reply to a deleted message easily, so send message to chat tagging user?
-                # Or reply then delete? Reply then delete is standard but the reply might lose context if parent is gone.
-                # Telegram allows replying, then deleting the parent. The reply remains.
                 await update.message.reply_text(
                     f"@{user.username or user.first_name} Будь ласка, спілкуйтеся Українською🇺🇦, Англійською🇬🇧 або Івритом🇮🇱!"
                 )
