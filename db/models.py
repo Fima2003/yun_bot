@@ -28,3 +28,7 @@ class GroupMember(BaseModel):
 
     class Meta:
         primary_key = CompositeKey('user_id', 'chat_id')
+
+class BotStats(BaseModel):
+    key = CharField(primary_key=True)
+    value = IntegerField(default=0)

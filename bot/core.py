@@ -4,6 +4,7 @@ from telegram.ext.filters import TEXT, PHOTO, CAPTION
 from bot.handlers.scam_handler import handle_scam
 from bot.handlers.start import start_command
 from bot.handlers.join_handler import join_handler
+from bot.handlers.stats import stats_command
 import logging
 from telegram.ext import ApplicationBuilder, MessageHandler, CommandHandler, ChatMemberHandler
 from config import TELEGRAM_BOT_TOKEN
@@ -20,6 +21,11 @@ def run_bot():
     # Handle /start command
     application.add_handler(
         CommandHandler('start', start_command),
+    )
+    
+    # Handle /stats command
+    application.add_handler(
+        CommandHandler('stats', stats_command),
     )
 
     # Handle new members

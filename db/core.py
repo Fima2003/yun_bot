@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from db.models import db, GroupMember
+from db.models import db, GroupMember, BotStats
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +8,7 @@ def init_db():
     """Initializes the database and creates tables if they don't exist."""
     try:
         db.connect()
-        db.create_tables([GroupMember])
+        db.create_tables([GroupMember, BotStats])
         logger.info("Database initialized successfully.")
         db.close()
     except Exception as e:
@@ -57,3 +57,24 @@ def increment_message_count(user_id: int, chat_id: int):
         query.execute()
     except Exception as e:
         logger.error(f"Error incrementing message count: {e}")
+
+def increment_blocked_count():
+    """Increments the global counter of blocked bots."""
+    try:
+        # Atomic update using Peewee's expressions
+        # upsert: try to insert 1, on conflict update value = value + 1
+        # SQLite replace/insert is tricky, but Postgres supports ON CONFLICT.
+        # For simplicity and cross-db compatibility (mostly), we can try get_or_create then update.
+        stat, created = BotStats.get_or_create(key='blocked_bots', defaults={'value': 0})
+        BotStats.update(value=BotStats.value + 1).where(BotStats.key == 'blocked_bots').execute()
+    except Exception as e:
+        logger.error(f"Error incrementing blocked count: {e}")
+
+def get_blocked_count() -> int:
+    """Returns the total number of blocked bots."""
+    try:
+        stat = BotStats.get_or_none(BotStats.key == 'blocked_bots')
+        return stat.value if stat else 0
+    except Exception as e:
+        logger.error(f"Error getting blocked count: {e}")
+        return 0
