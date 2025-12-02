@@ -47,3 +47,13 @@ def set_user_safe(user_id: int, chat_id: int, is_safe: bool = True):
         query.execute()
     except Exception as e:
         logger.error(f"Error setting user safe in DB: {e}")
+
+def increment_message_count(user_id: int, chat_id: int):
+    """Increments the message count for a user."""
+    try:
+        query = GroupMember.update(messages_count=GroupMember.messages_count + 1).where(
+            (GroupMember.user_id == user_id) & (GroupMember.chat_id == chat_id)
+        )
+        query.execute()
+    except Exception as e:
+        logger.error(f"Error incrementing message count: {e}")

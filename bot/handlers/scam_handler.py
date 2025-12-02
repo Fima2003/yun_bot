@@ -5,12 +5,30 @@ from config import SCAM_THRESHOLD
 from bot.services.gemini_service import GeminiService
 from bot.services.user_service import UserService
 from bot.services.language_service import LanguageService
+from db.core import get_user, increment_message_count
 
 logger = logging.getLogger(__name__)
 
 gemini_service = GeminiService()
 user_service = UserService()
 language_service = LanguageService()
+
+async def _get_image_data(update: Update):
+    if update.message.photo:
+        photo = update.message.photo[-1]
+        photo_file = await photo.get_file()
+        image_byte_array = await photo_file.download_as_bytearray()
+        return bytes(image_byte_array)
+    return None
+
+async def _ban_and_delete(update: Update, context: ContextTypes.DEFAULT_TYPE, chat, user, reason: str):
+    logger.warning(f"{reason}. Deleting and Banning.")
+    try:
+        await update.message.delete()
+        await context.bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
+        logger.info(f"User {user.id} banned.")
+    except Exception as e:
+        logger.error(f"Failed to delete/ban: {e}")
 
 async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -30,44 +48,53 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         text = update.message.text or update.message.caption
+        image_data = await _get_image_data(update)
         
-        # Logic 1: Language Detection (First check as requested)
+        # Logic 1: Language Detection
         is_russian = False
         if text and language_service.is_russian(text):
             is_russian = True
         
-        if not is_russian:
-            logger.info("Message not in Russian (or no text). Skipping checks.")
+        # Logic 2: Determine if we need to analyze
+        should_analyze = False
+        
+        if is_russian:
+            should_analyze = True
+            logger.info("Russian message detected. Analyzing...")
+        else:
+            # Check message count for non-Russian
+            user_record = get_user(user.id, chat.id)
+            msg_count = user_record.messages_count if user_record else 0
+            
+            if msg_count >= 2:
+                logger.info(f"User has sent {msg_count} messages. Trusted. Skipping check.")
+                increment_message_count(user.id, chat.id)
+                return
+            
+            logger.info(f"User has sent {msg_count} messages (Threshold: 2). Analyzing non-Russian message...")
+            should_analyze = True
+
+        if not should_analyze:
+            logger.info("Not analyzing. Returning.")
             return
-
-        # Logic 2: Gemini Analysis (Only if Russian)
-        # Prepare content for Gemini
-        image_data = None
-        if update.message.photo:
-            # Get the largest photo
-            photo = update.message.photo[-1]
-            photo_file = await photo.get_file()
-            image_byte_array = await photo_file.download_as_bytearray()
-            image_data = bytes(image_byte_array)
-
-        logger.info("Analyzing Russian message with Gemini...")
+        
+        # Logic 3: Analysis
         scam_score = await gemini_service.analyze_content(text, image_data)
         logger.info(f"Gemini Scam Score: {scam_score}")
-
-        # Logic 3: Action based on Scam Score
+        
         if scam_score > SCAM_THRESHOLD:
-            # Case: Russian AND Scam -> Delete & Ban
-            logger.warning(f"Scam detected (Score: {scam_score}) in Russian message. Deleting and Banning.")
-            try:
-                await update.message.delete()
-                await context.bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
-                logger.info(f"User {user.id} banned.")
-            except Exception as e:
-                logger.error(f"Failed to delete/ban: {e}")
+            reason = f"Scam detected (Score: {scam_score}) in {'Russian' if is_russian else 'non-Russian'} message"
+            await _ban_and_delete(update, context, chat, user, reason)
+            return
+
+        # Logic 4: Post-Analysis Actions (if not banned)
+        if not is_russian:
+            # Safe non-Russian message -> Increment count
+            increment_message_count(user.id, chat.id)
+            return
         else:
-            # Case: Russian BUT Not Scam -> Check User Age
-            logger.info(f"Russian message detected but not scam (Score: {scam_score}). Checking user age...")
-            
+            # Safe Russian message -> Check Age
+            logger.info(f"Russian message detected but not scam. Checking user age...")
             is_new = await user_service.is_new_user(user.id, chat.id, context)
             
             if not is_new:
@@ -77,7 +104,6 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # User is NEW -> Delete & Warn
             logger.info("User is NEW. Deleting and Warning.")
             try:
-                # Reply first so the user sees it (if possible before delete, or tag them)
                 await update.message.reply_text(
                     f"@{user.username or user.first_name} Будь ласка, спілкуйтеся Українською🇺🇦, Англійською🇬🇧 або Івритом🇮🇱!"
                 )

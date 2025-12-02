@@ -24,6 +24,7 @@ class GroupMember(BaseModel):
     chat_id = BigIntegerField()
     join_date = DateTimeField(null=True)
     is_safe = BooleanField(default=False)
+    messages_count = IntegerField(default=0)
 
     class Meta:
         primary_key = CompositeKey('user_id', 'chat_id')
