@@ -56,8 +56,21 @@ class GeminiService:
             except Exception as e:
                 logger.error(f"Error processing image: {e}")
 
+        # Configure safety settings to allow analyzing potentially harmful content (scams)
+        safety_settings = {
+            genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+            genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+        }
+
         try:
-            response = self.model.generate_content(content)
+            response = self.model.generate_content(content, safety_settings=safety_settings)
+            
+            if not response.parts:
+                logger.warning(f"Gemini returned no parts. Finish reason: {response.prompt_feedback}")
+                return 0.0
+
             # Clean up response text to ensure it's valid JSON
             response_text = response.text.strip()
             if response_text.startswith("```json"):
