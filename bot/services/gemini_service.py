@@ -7,11 +7,12 @@ from config import GEMINI_API_KEY
 
 logger = logging.getLogger(__name__)
 
+
 class GeminiService:
     def __init__(self):
         if GEMINI_API_KEY:
             genai.configure(api_key=GEMINI_API_KEY)
-            self.model = genai.GenerativeModel('gemini-flash-latest')
+            self.model = genai.GenerativeModel("gemini-flash-latest")
         else:
             logger.error("GEMINI_API_KEY not found in environment variables.")
             self.model = None
@@ -44,11 +45,11 @@ class GeminiService:
         - Urgent requests for money
         - Suspicious investment opportunities
         """
-        
+
         content = [prompt]
         if text:
             content.append(f"Message Text: {text}")
-        
+
         if image_data:
             try:
                 image = Image.open(io.BytesIO(image_data))
@@ -65,10 +66,24 @@ class GeminiService:
         }
 
         try:
-            response = self.model.generate_content(content, safety_settings=safety_settings)
-            
+            response = self.model.generate_content(
+                content, safety_settings=safety_settings
+            )
+
+            # Check if the prompt was blocked or if there are no candidates
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
+                logger.warning(
+                    f"Gemini blocked content. Start Reason: {response.prompt_feedback.block_reason}"
+                )
+                # If blocked, treat as high risk/scam to be safe (or just delete)
+                return 1.0
+
+            if not response.candidates:
+                logger.warning("Gemini returned no candidates.")
+                return 0.0
+
             if not response.parts:
-                logger.warning(f"Gemini returned no parts. Finish reason: {response.prompt_feedback}")
+                logger.warning("Gemini returned no parts.")
                 return 0.0
 
             # Clean up response text to ensure it's valid JSON
@@ -77,9 +92,11 @@ class GeminiService:
                 response_text = response_text[7:-3].strip()
             elif response_text.startswith("```"):
                 response_text = response_text[3:-3].strip()
-                
+
             result = json.loads(response_text)
             return float(result.get("scam", 0.0))
         except Exception as e:
             logger.error(f"Error analyzing content with Gemini: {e}")
+            # If we fail to analyze, better to be safe? Or fail open?
+            # Default to 0.0 (safe) to avoid false bans on technical errors
             return 0.0
