@@ -7,7 +7,9 @@ from pythonjsonlogger import jsonlogger
 logger = logging.getLogger()
 logHandler = logging.StreamHandler(sys.stdout)
 formatter = jsonlogger.JsonFormatter(
-    "%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    "%(asctime)s %(name)s %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    rename_fields={"levelname": "level"},
 )
 logHandler.setFormatter(formatter)
 logger.addHandler(logHandler)
