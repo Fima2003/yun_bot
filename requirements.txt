@@ -5,3 +5,4 @@ python-dotenv
 lingua-language-detector
 peewee
 psycopg2-binary
+python-json-logger

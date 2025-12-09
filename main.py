@@ -1,10 +1,17 @@
 # This line is first to load environment variables
 import logging
+import sys
+from pythonjsonlogger import jsonlogger
 
-# Configure logging immediately, before importing other modules that might log at module level
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+# Configure JSON logging
+logger = logging.getLogger()
+logHandler = logging.StreamHandler(sys.stdout)
+formatter = jsonlogger.JsonFormatter(
+    "%(asctime)s %(name)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
 )
+logHandler.setFormatter(formatter)
+logger.addHandler(logHandler)
+logger.setLevel(logging.INFO)
 
 from bot.core import run_bot
 from db.core import init_db
