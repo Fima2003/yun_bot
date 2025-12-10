@@ -34,6 +34,8 @@ class GeminiService:
             "scam": <double between 0.0 and 1.0>
         }
         
+        Do NOT return any other text, markdown formatting, or explanations. Return ONLY the JSON object.
+        
         "scam" indicates the possibility of this message being a scam. 
         0.0 means definitely safe.
         1.0 means definitely a scam.
@@ -86,12 +88,18 @@ class GeminiService:
                 logger.warning("Gemini returned no parts.")
                 return 0.0
 
+            # Log the raw response for debugging
+            logger.info(f"Gemini Raw Response: {response.text}")
+
             # Clean up response text to ensure it's valid JSON
             response_text = response.text.strip()
-            if response_text.startswith("```json"):
-                response_text = response_text[7:-3].strip()
-            elif response_text.startswith("```"):
-                response_text = response_text[3:-3].strip()
+
+            # Find the JSON block
+            start_index = response_text.find("{")
+            end_index = response_text.rfind("}")
+
+            if start_index != -1 and end_index != -1:
+                response_text = response_text[start_index : end_index + 1]
 
             result = json.loads(response_text)
             return float(result.get("scam", 0.0))
