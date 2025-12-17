@@ -71,11 +71,6 @@ def run_bot():
         CommandHandler("start", start_command),
     )
 
-    # Handle /stats command
-    application.add_handler(
-        CommandHandler("stats", stats_command),
-    )
-
     # Handle new members
     application.add_handler(MessageHandler(StatusUpdate.NEW_CHAT_MEMBERS, join_handler))
 
