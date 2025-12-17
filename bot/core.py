@@ -71,6 +71,10 @@ def run_bot():
         CommandHandler("start", start_command),
     )
 
+    application.add_handler(
+        CommandHandler("add_user", add_user_command),
+    )
+
     # Handle new members
     application.add_handler(MessageHandler(StatusUpdate.NEW_CHAT_MEMBERS, join_handler))
 
@@ -79,11 +83,6 @@ def run_bot():
 
     application.add_handler(
         ChatMemberHandler(added_to_group_chat_handler, ChatMemberHandler.MY_CHAT_MEMBER)
-    )
-
-    # Handle /add_user command (Admin only)
-    application.add_handler(
-        CommandHandler("add_user", add_user_command),
     )
 
     logger.info("Bot is running now...")

@@ -19,7 +19,7 @@ def init_db():
 def add_user(
     user_id: int, chat_id: int, join_date: datetime = None, is_safe: bool = False
 ):
-    """Adds or updates a user in the database."""
+    """Adds or updates a user in the database. Returns True if successful."""
     try:
         user = GroupMember.get_or_none(
             (GroupMember.user_id == user_id) & (GroupMember.chat_id == chat_id)
@@ -40,8 +40,10 @@ def add_user(
             GroupMember.create(
                 user_id=user_id, chat_id=chat_id, join_date=join_date, is_safe=is_safe
             )
+        return True
     except Exception as e:
         logger.error(f"Error adding user to DB: {e}")
+        return False
 
 
 def get_user(user_id: int, chat_id: int):
@@ -69,12 +71,19 @@ def set_user_safe(user_id: int, chat_id: int, is_safe: bool = True):
 
 
 def increment_message_count(user_id: int, chat_id: int):
-    """Increments the message count for a user."""
+    """Increments the message count for a user, creating them if they don't exist."""
     try:
-        query = GroupMember.update(messages_count=GroupMember.messages_count + 1).where(
-            (GroupMember.user_id == user_id) & (GroupMember.chat_id == chat_id)
+        user, created = GroupMember.get_or_create(
+            user_id=user_id,
+            chat_id=chat_id,
+            defaults={
+                "messages_count": 1,
+                "join_date": datetime.now(),  # Using standard datetime
+            },
         )
-        query.execute()
+        if not created:
+            user.messages_count += 1
+            user.save()
     except Exception as e:
         logger.error(f"Error incrementing message count: {e}")
 
