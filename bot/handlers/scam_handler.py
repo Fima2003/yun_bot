@@ -98,6 +98,7 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info(f"Gemini Scam Score: {scam_score}")
 
         if scam_score > SCAM_THRESHOLD:
+            logger.info(f"SCAM DETECTED TEXT: {text}")
             reason = f"Scam detected (Score: {scam_score}) in {'Russian' if is_russian else 'non-Russian'} message"
             await _ban_and_delete(update, context, chat, user, reason)
             return
