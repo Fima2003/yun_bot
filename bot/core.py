@@ -5,7 +5,8 @@ from telegram.ext.filters import TEXT, PHOTO, CAPTION
 from bot.handlers.scam_handler import handle_scam
 from bot.handlers.start import start_command
 from bot.handlers.join_handler import join_handler
-from bot.handlers.stats import stats_command
+from bot.handlers.admin import add_user_command
+
 import logging
 from telegram.ext import (
     ApplicationBuilder,
@@ -83,6 +84,11 @@ def run_bot():
 
     application.add_handler(
         ChatMemberHandler(added_to_group_chat_handler, ChatMemberHandler.MY_CHAT_MEMBER)
+    )
+
+    # Handle /add_user command (Admin only)
+    application.add_handler(
+        CommandHandler("add_user", add_user_command),
     )
 
     logger.info("Bot is running now...")
