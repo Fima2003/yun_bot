@@ -21,11 +21,25 @@ def add_user(
 ):
     """Adds or updates a user in the database."""
     try:
-        # Peewee's insert_or_replace equivalent usually involves checking existence or using specific dialect features.
-        # For SQLite, replace() works.
-        GroupMember.create(
-            user_id=user_id, chat_id=chat_id, join_date=join_date, is_safe=is_safe
+        user = GroupMember.get_or_none(
+            (GroupMember.user_id == user_id) & (GroupMember.chat_id == chat_id)
         )
+
+        if user:
+            # User exists
+            if is_safe:
+                # If is_safe is True, enforce overwrite (as requested)
+                user.is_safe = True
+                user.join_date = join_date
+                user.save()
+                logger.info(
+                    f"User {user_id} in {chat_id} overwritten with is_safe=True"
+                )
+        else:
+            # User does not exist
+            GroupMember.create(
+                user_id=user_id, chat_id=chat_id, join_date=join_date, is_safe=is_safe
+            )
     except Exception as e:
         logger.error(f"Error adding user to DB: {e}")
 
