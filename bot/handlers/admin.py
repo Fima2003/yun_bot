@@ -40,6 +40,9 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_user_id = int(args[0])
         target_chat_id = int(args[1])
 
+        await context.bot.unbanChatMember(
+            chat_id=target_chat_id, user_id=target_user_id, only_if_banned=True
+        )
         # 4. Execute Logic
         # We set is_safe=True as implied by "admin adding user manually"
         add_user(

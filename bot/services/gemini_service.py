@@ -2,7 +2,8 @@ import logging
 import json
 import io
 from PIL import Image
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from config import GEMINI_API_KEY
 
 logger = logging.getLogger(__name__)
@@ -11,19 +12,20 @@ logger = logging.getLogger(__name__)
 class GeminiService:
     def __init__(self):
         if GEMINI_API_KEY:
-            genai.configure(api_key=GEMINI_API_KEY)
-            self.model = genai.GenerativeModel("gemini-flash-latest")
+            self.client = genai.Client(api_key=GEMINI_API_KEY)
+            self.model_name = "gemini-flash-latest"
         else:
             logger.error("GEMINI_API_KEY not found in environment variables.")
-            self.model = None
+            self.client = None
+            self.model_name = None
 
     async def analyze_content(self, text: str, image_data: bytes = None) -> float:
         """
         Analyzes text and optional image using Gemini to determine scam probability.
         Returns a float between 0.0 and 1.0.
         """
-        if not self.model:
-            logger.error("Gemini model not initialized.")
+        if not self.client:
+            logger.error("Gemini client not initialized.")
             return 0.0
 
         prompt = """
@@ -48,53 +50,60 @@ class GeminiService:
         - Suspicious investment opportunities
         """
 
-        content = [prompt]
+        contents = []
         if text:
-            content.append(f"Message Text: {text}")
+            # Combine prompt and text into one string or use multiple parts.
+            # Using single string for clarity in prompt structure.
+            full_prompt = f"{prompt}\n\nMessage Text: {text}"
+            contents.append(full_prompt)
+        else:
+            contents.append(prompt)
 
         if image_data:
             try:
+                # google-genai SDK handles PIL images
                 image = Image.open(io.BytesIO(image_data))
-                content.append(image)
+                contents.append(image)
             except Exception as e:
                 logger.error(f"Error processing image: {e}")
 
-        # Configure safety settings to allow analyzing potentially harmful content (scams)
-        safety_settings = {
-            genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-            genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
-        }
+        # Configure safety settings
+        safety_settings = [
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+            types.SafetySetting(
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=types.HarmBlockThreshold.BLOCK_NONE,
+            ),
+        ]
+
+        config = types.GenerateContentConfig(safety_settings=safety_settings)
 
         try:
-            response = self.model.generate_content(
-                content, safety_settings=safety_settings
+            # Use client.aio for async calls
+            response = await self.client.aio.models.generate_content(
+                model=self.model_name, contents=contents, config=config
             )
 
-            # Check if the prompt was blocked or if there are no candidates
-            if response.prompt_feedback and response.prompt_feedback.block_reason:
-                logger.warning(
-                    f"Gemini blocked content. Start Reason: {response.prompt_feedback.block_reason}"
-                )
-                # If blocked, treat as high risk/scam to be safe (or just delete)
-                return 1.0
-
-            if not response.candidates:
-                logger.warning("Gemini returned no candidates.")
+            if not response.text:
+                logger.warning("Gemini returned no text.")
                 return 0.0
 
-            if not response.parts:
-                logger.warning("Gemini returned no parts.")
-                return 0.0
-
-            # Log the raw response for debugging
             logger.info(f"Gemini Raw Response: {response.text}")
 
-            # Clean up response text to ensure it's valid JSON
             response_text = response.text.strip()
 
-            # Find the JSON block
+            # Robust JSON extraction
             start_index = response_text.find("{")
             end_index = response_text.rfind("}")
 
@@ -103,8 +112,7 @@ class GeminiService:
 
             result = json.loads(response_text)
             return float(result.get("scam", 0.0))
+
         except Exception as e:
             logger.error(f"Error analyzing content with Gemini: {e}")
-            # If we fail to analyze, better to be safe? Or fail open?
-            # Default to 0.0 (safe) to avoid false bans on technical errors
             return 0.0
