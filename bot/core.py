@@ -5,7 +5,7 @@ from telegram.ext.filters import TEXT, PHOTO, CAPTION
 from bot.handlers.scam_handler import handle_scam
 from bot.handlers.start import start_command
 from bot.handlers.join_handler import join_handler
-from bot.handlers.admin import add_user_command
+from bot.handlers.admin import unban_user_command
 
 import logging
 from telegram.ext import (
@@ -72,7 +72,7 @@ def run_bot():
     )
 
     application.add_handler(
-        CommandHandler("add_user", add_user_command),
+        CommandHandler("unban_user", unban_user_command),
     )
 
     # Handle new members

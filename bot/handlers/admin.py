@@ -8,10 +8,10 @@ from db.core import add_user
 logger = logging.getLogger(__name__)
 
 
-async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def unban_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Admin only command to manually add a specific user to a specific chat as SAFE.
-    Usage: /add_user <user_id> <chat_id>
+    Usage: /unban_user <user_id> <chat_id>
     """
     # 1. Private Chat Check
     if update.effective_chat.type != "private":
@@ -27,14 +27,14 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Convert to string for comparison to avoid type issues (env var is str)
     if str(user.id) != str(ADMIN_ID):
-        logger.warning(f"Unauthorized access attempt to /add_user by {user.id}")
+        logger.warning(f"Unauthorized access attempt to /unban_user by {user.id}")
         return
 
     # 3. Parse Attributes
     try:
         args = context.args
         if len(args) != 2:
-            await update.message.reply_text("Usage: /add_user <user_id> <chat_id>")
+            await update.message.reply_text("Usage: /unban_user <user_id> <chat_id>")
             return
 
         target_user_id = int(args[0])
@@ -53,14 +53,14 @@ async def add_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(
-            f"✅ User {target_user_id} added to Chat {target_chat_id} as SAFE."
+            f"✅ User {target_user_id} unbanned from Chat {target_chat_id}, and marked as SAFE."
         )
         logger.info(
-            f"Manual add_user executed by admin {user.id}: User {target_user_id} -> Chat {target_chat_id}"
+            f"Manual unban_user executed by admin {user.id}: User {target_user_id} -> Chat {target_chat_id}"
         )
 
     except ValueError:
         await update.message.reply_text("Error: IDs must be integers.")
     except Exception as e:
-        logger.error(f"Error in add_user_command: {e}")
+        logger.error(f"Error in unban_user_command: {e}")
         await update.message.reply_text(f"❌ Error: {e}")
