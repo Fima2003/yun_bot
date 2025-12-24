@@ -77,10 +77,10 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_record = get_user(user.id, chat.id)
             msg_count = user_record.messages_count if user_record else 0
 
+            logger.info(f"User has sent {msg_count} messages.")
+
             if msg_count >= 2:
-                logger.info(
-                    f"User has sent {msg_count} messages. Trusted. Skipping check."
-                )
+                logger.info("Trusted. Skipping check.")
                 increment_message_count(user.id, chat.id)
                 return
 

@@ -5,7 +5,7 @@ from telegram.ext.filters import TEXT, PHOTO, CAPTION
 from bot.handlers.scam_handler import handle_scam
 from bot.handlers.start import start_command
 from bot.handlers.join_handler import join_handler
-from bot.handlers.admin import unban_user_command
+from bot.handlers.admin import unban_user_command, ban_user_command
 
 import logging
 from telegram.ext import (
@@ -66,7 +66,6 @@ def run_bot():
         ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
     )
 
-    # Handle /start command
     application.add_handler(
         CommandHandler("start", start_command),
     )
@@ -75,14 +74,23 @@ def run_bot():
         CommandHandler("unban_user", unban_user_command),
     )
 
+    application.add_handler(
+        CommandHandler("ban_user", ban_user_command),
+    )
+
     # Handle new members
-    application.add_handler(MessageHandler(StatusUpdate.NEW_CHAT_MEMBERS, join_handler))
+    application.add_handler(
+        MessageHandler(StatusUpdate.NEW_CHAT_MEMBERS, callback=join_handler)
+    )
 
     # Handle text messages and messages with photos/captions
     application.add_handler(MessageHandler(TEXT | PHOTO | CAPTION, handle_scam))
 
     application.add_handler(
-        ChatMemberHandler(added_to_group_chat_handler, ChatMemberHandler.MY_CHAT_MEMBER)
+        ChatMemberHandler(
+            callback=added_to_group_chat_handler,
+            chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER,
+        )
     )
 
     logger.info("Bot is running now...")
