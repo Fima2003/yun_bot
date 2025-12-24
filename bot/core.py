@@ -5,7 +5,11 @@ from telegram.ext.filters import TEXT, PHOTO, CAPTION
 from bot.handlers.scam_handler import handle_scam
 from bot.handlers.start import start_command
 from bot.handlers.join_handler import join_handler
-from bot.handlers.admin import unban_user_command, ban_user_command
+from bot.handlers.admin import (
+    unban_user_command,
+    ban_user_command,
+    remove_thread_command,
+)
 
 import logging
 from telegram.ext import (
@@ -51,7 +55,7 @@ async def post_init(application: Application):
                 await application.bot.ban_chat_member(
                     chat_id=CLEANUP_CHAT_ID, user_id=CLEANUP_USER_ID
                 )
-                increment_blocked_count()
+                increment_blocked_count(chat_id=int(CLEANUP_CHAT_ID))
                 logger.info(f"Startup cleanup: User {CLEANUP_USER_ID} banned.")
             except Exception as e:
                 logger.error(f"Startup cleanup: Failed to ban user: {e}")
@@ -76,6 +80,10 @@ def run_bot():
 
     application.add_handler(
         CommandHandler("ban_user", ban_user_command),
+    )
+
+    application.add_handler(
+        CommandHandler("remove_thread", remove_thread_command),
     )
 
     # Handle new members

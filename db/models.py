@@ -33,3 +33,10 @@ class GroupMember(BaseModel):
 class BotStats(BaseModel):
     key = CharField(primary_key=True)
     value = IntegerField(default=0)
+
+
+class Chat(BaseModel):
+    chat_id = BigIntegerField(primary_key=True)
+    threads_to_exclude = TextField(default="[]")  # stored as JSON
+    known_users = IntegerField(default=0)
+    banned_users = IntegerField(default=0)

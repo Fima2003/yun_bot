@@ -5,7 +5,12 @@ from config import SCAM_THRESHOLD
 from bot.services.gemini_service import GeminiService
 from bot.services.user_service import UserService
 from bot.services.language_service import LanguageService
-from db.core import get_user, increment_message_count, increment_blocked_count
+from db.core import (
+    get_user,
+    increment_message_count,
+    increment_blocked_count,
+    get_excluded_threads,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +35,7 @@ async def _ban_and_delete(
     try:
         await update.message.delete()
         await context.bot.ban_chat_member(chat_id=chat.id, user_id=user.id)
-        increment_blocked_count()
+        increment_blocked_count(chat_id=update.effective_chat.id)
         logger.info(f"User {user.id} banned.")
     except Exception as e:
         logger.error(f"Failed to delete/ban: {e}")
@@ -46,6 +51,17 @@ async def handle_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.message.from_user
     chat = update.message.chat
+
+    # Check Thread Exclusion
+    message_thread_id = update.message.message_thread_id
+    if message_thread_id:
+        logger.info(f"Message received in thread {message_thread_id}")
+        excluded_threads = get_excluded_threads(chat.id)
+        if message_thread_id in excluded_threads:
+            logger.info(
+                f"Skipping scam check for Thread {message_thread_id} in Chat {chat.id} (Excluded)"
+            )
+            return
 
     # Only check in groups/supergroups
     if chat.type not in ["group", "supergroup"]:

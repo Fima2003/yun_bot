@@ -1,15 +1,100 @@
 import logging
+import json
 from datetime import datetime
-from db.models import db, GroupMember, BotStats
+from datetime import datetime
+from db.models import db, GroupMember, BotStats, Chat
 
 logger = logging.getLogger(__name__)
+
+
+from peewee import fn
+
+
+import json
+
+# ...
+
+
+def update_excluded_threads(chat_id: int, thread_ids: list[int]):
+    """Updates the list of excluded threads for a chat."""
+    try:
+        chat, created = Chat.get_or_create(chat_id=chat_id)
+
+        try:
+            current_threads = json.loads(chat.threads_to_exclude)
+        except json.JSONDecodeError:
+            current_threads = []
+
+        # Use set for uniqueness then convert back to list
+        updated_threads = list(set(current_threads + thread_ids))
+
+        chat.threads_to_exclude = json.dumps(updated_threads)
+        chat.save()
+        logger.info(f"Updated excluded threads for Chat {chat_id}: {updated_threads}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating excluded threads: {e}")
+        return True
+    except Exception as e:
+        logger.error(f"Error updating excluded threads: {e}")
+        return False
+
+
+def get_excluded_threads(chat_id: int) -> list[int]:
+    """Retrieves the list of excluded threads for a chat."""
+    try:
+        chat = Chat.get_or_none(Chat.chat_id == chat_id)
+        if chat and chat.threads_to_exclude:
+            return json.loads(chat.threads_to_exclude)
+        return []
+    except Exception as e:
+        logger.error(f"Error getting excluded threads: {e}")
+        return []
+
+
+def migrate_chats():
+    """Migrates existing GroupMembers to populates the Chat table."""
+    try:
+        # Group members by chat_id and count them
+        query = GroupMember.select(
+            GroupMember.chat_id, fn.COUNT(GroupMember.user_id).alias("member_count")
+        ).group_by(GroupMember.chat_id)
+
+        for entry in query:
+            chat_id = entry.chat_id
+            count = entry.member_count
+
+            # Create or get the Chat record
+            chat, created = Chat.get_or_create(chat_id=chat_id)
+
+            # Update known_users
+            if chat.known_users != count:
+                chat.known_users = count
+                chat.save()
+                logger.info(f"Migrated Chat {chat_id}: Updated known_users to {count}")
+            elif created:
+                chat.known_users = count
+                chat.save()
+                logger.info(
+                    f"Migrated Chat {chat_id}: Created with {count} known_users"
+                )
+
+        logger.info("Chat table migration completed.")
+    except Exception as e:
+        logger.error(f"Error migrating chats: {e}")
 
 
 def init_db():
     """Initializes the database and creates tables if they don't exist."""
     try:
         db.connect()
-        db.create_tables([GroupMember, BotStats])
+        # User commented out drop_tables to preserve data for migration
+        # db.drop_tables([GroupMember, BotStats, Chat], safe=True)
+        db.create_tables([GroupMember, BotStats, Chat])
+
+        # Run migration to populate Chat table from existing GroupMembers
+        migrate_chats()
+
         logger.info("Database initialized successfully.")
         db.close()
     except Exception as e:
@@ -88,19 +173,25 @@ def increment_message_count(user_id: int, chat_id: int):
         logger.error(f"Error incrementing message count: {e}")
 
 
-def increment_blocked_count():
-    """Increments the global counter of blocked bots."""
+def increment_blocked_count(chat_id: int = None):
+    """Increments the global counter of blocked bots and optionally updates chat-specific banned count."""
     try:
-        # Atomic update using Peewee's expressions
-        # upsert: try to insert 1, on conflict update value = value + 1
-        # SQLite replace/insert is tricky, but Postgres supports ON CONFLICT.
-        # For simplicity and cross-db compatibility (mostly), we can try get_or_create then update.
+        # 1. Global Stats
         stat, created = BotStats.get_or_create(
             key="blocked_bots", defaults={"value": 0}
         )
         BotStats.update(value=BotStats.value + 1).where(
             BotStats.key == "blocked_bots"
         ).execute()
+
+        # 2. Chat Stats
+        if chat_id:
+            chat, created_chat = Chat.get_or_create(chat_id=chat_id)
+            # We use an atomic update here too where possible, or just increment
+            Chat.update(banned_users=Chat.banned_users + 1).where(
+                Chat.chat_id == chat_id
+            ).execute()
+
     except Exception as e:
         logger.error(f"Error incrementing blocked count: {e}")
 
